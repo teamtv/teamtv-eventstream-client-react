@@ -1,0 +1,6 @@
+{
+  "presets": [
+    ["@babel/preset-env", { "modules": false, "shippedProposals": true }],
+    "@babel/preset-react"
+  ]
+}

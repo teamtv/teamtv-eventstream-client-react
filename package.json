@@ -1,10 +1,12 @@
 {
   "name": "@teamtv/eventstream-client-react",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "React component for easy use of the teamtv eventstream-client",
-  "main": "index.js",
+  "main": "./distribution/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel index.js --out-file distribution/index.js",
+    "prepublish": "npm build"
   },
   "repository": {
     "type": "git",
@@ -25,5 +27,11 @@
   "dependencies": {
     "@teamtv/eventstream-client": "^1.0.1",
     "react": "^16.8.6"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.0.0-beta.44",
+    "@babel/core": "^7.0.0-beta.41",
+    "@babel/preset-env": "^7.0.0-beta.44",
+    "@babel/preset-react": "^7.0.0"
   }
 }
