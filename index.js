@@ -121,8 +121,8 @@ const StatsProvider = ({endpointUrl, children}) => {
     eventStream.on("shot", ({id, time, person, result, type, possession: {teamId}}) => {
       addEvent({id, eventType: "shot", result, teamId, time, person, type});
     });
-    eventStream.on("goalCorrection", ({id, teamId}) => {
-      addEvent({eventType: "goalCorrection", id, teamId});
+    eventStream.on("goalCorrection", ({id, teamId, time}) => {
+      addEvent({eventType: "goalCorrection", id, teamId, time});
     });
     eventStream.on("startPeriod", ({period}) => {
       addEvent({eventType: "startPeriod", period});
