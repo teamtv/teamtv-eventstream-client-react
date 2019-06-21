@@ -53,25 +53,22 @@ const StatsProvider = ({endpointUrl, children}) => {
 
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
-      for(const event of _eventLog) {
-        if (event.eventType === "removed") {
-          if (!!event.id)
-          {
-            const index = eventLog.findIndex(({id}) => id === event.id);
-            if (index !== -1) {
-              eventLog.splice(index, 1);
-            }
-          }
-        } else {
-          eventLog.push(event);
-        }
-      }
-      setEventLog(eventLog);
-      _eventLog.splice(0, _eventLog.length);
+      setEventLog(_eventLog.slice());
     }, 10);
 
     const addEvent = (event) => {
-      _eventLog.push(event);
+      if (event.eventType === "removed") {
+        if (!!event.id)
+        {
+          const index = _eventLog.findIndex(({id}) => id === event.id);
+          if (index !== -1) {
+            _eventLog.splice(index, 1);
+          }
+        }
+      } else {
+        _eventLog.push(event);
+      }
+
       scheduleFlush();
     };
 
