@@ -32,7 +32,7 @@ const statsCollector = (eventLog, type, preCalculated) => {
       }
     case 'score':
       const match = preCalculated.match || statsCollector(eventLog, 'match');
-      const goals = eventLog.filter(({eventType}) => eventType === "goal");
+      const goals = eventLog.filter(({eventType}) => eventType === "goal" || eventType === "goalCorrection");
       return {
         home: goals.filter(({teamId}) => teamId === match.homeTeam.teamId).length,
         away: goals.filter(({teamId}) => teamId === match.awayTeam.teamId).length,
@@ -53,7 +53,20 @@ const StatsProvider = ({endpointUrl, children}) => {
 
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
-      setEventLog(eventLog.concat(_eventLog));
+      for(const event of _eventLog) {
+        if (event.eventType === "removed") {
+          if (!!event.id)
+          {
+            const index = eventLog.findIndex(({id}) => id === event.id);
+            if (index !== -1) {
+              eventLog.splice(index, 1);
+            }
+          }
+        } else {
+          eventLog.push(event);
+        }
+      }
+      setEventLog(eventLog);
       _eventLog.splice(0, _eventLog.length);
     }, 10);
 
@@ -66,16 +79,22 @@ const StatsProvider = ({endpointUrl, children}) => {
       addEvent({eventType: "sportingEventCreated", homeTeam, awayTeam, scheduledAt});
     });
 
-    eventStream.on("shot", ({time, person, result, type, possession: {teamId}}) => {
+    eventStream.on("shot", ({id, time, person, result, type, possession: {teamId}}) => {
       if (result === "GOAL") {
-        addEvent({eventType: "goal", teamId, time, person, type});
+        addEvent({id, eventType: "goal", teamId, time, person, type});
       }
+    });
+    eventStream.on("goalCorrection", ({id, teamId}) => {
+      addEvent({eventType: "goalCorrection", id, teamId});
     });
     eventStream.on("startPeriod", ({period}) => {
       addEvent({eventType: "startPeriod", period});
     });
     eventStream.on("endPeriod", ({period}) => {
       addEvent({eventType: "startPeriod", period});
+    });
+    eventStream.on("observationRemoved", ({id}) => {
+      addEvent({eventType: "removed", id});
     });
 
     return () => {
@@ -94,12 +113,14 @@ const StatsConsumer = ({types, children}) => {
   return (
     <Context.Consumer>
       {
-        ({value}) => {
+        (eventLog) => {
           const stats = {
-            match: statsCollector(value, 'match'),
+            match: statsCollector(eventLog, 'match'),
           };
-          for(const statsType of types) {
-            stats[statsType] = statsCollector(value, statsType, stats);
+          if (stats.match) {
+            for(const statsType of types) {
+              stats[statsType] = statsCollector(eventLog, statsType, stats);
+            }
           }
           return children(stats);
         }
