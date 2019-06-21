@@ -17,7 +17,7 @@ const debounce = (func, wait, immediate) => {
   };
 };
 
-const statsCollector = (eventLog, type) => {
+const statsCollector = (eventLog, type, preCalculated) => {
   switch (type) {
     case 'match':
       const createdEvents = eventLog.filter(({eventType}) => eventType === "sportingEventCreated");
@@ -31,7 +31,7 @@ const statsCollector = (eventLog, type) => {
         return null;
       }
     case 'score':
-      const match = statsCollector(eventLog, 'match');
+      const match = preCalculated.match || statsCollector(eventLog, 'match');
       const goals = eventLog.filter(({eventType}) => eventType === "goal");
       return {
         home: goals.filter(({teamId}) => teamId === match.homeTeam.teamId).length,
@@ -95,13 +95,13 @@ const StatsConsumer = ({types, children}) => {
     <Context.Consumer>
       {
         ({value}) => {
-          const props = {
+          const stats = {
             match: statsCollector(value, 'match'),
           };
           for(const statsType of types) {
-            props[statsType] = statsCollector(value, statsType);
+            stats[statsType] = statsCollector(value, statsType, stats);
           }
-          return children(props);
+          return children(stats);
         }
       }
     </Context.Consumer>
