@@ -75,6 +75,17 @@ const statsCollector = (eventLog, type, preCalculated) => {
         };
       });
     }
+    case 'substitutions': {
+      const match = preCalculated.match || statsCollector(eventLog, 'match');
+      return eventLog.filter(
+        ({eventType}) => eventType === "substitution"
+      ).map((substitution) => {
+        return {
+          team: substitution.teamId === match.homeTeam.teamId ? match.homeTeam : match.awayTeam,
+          ...substitution
+        }
+      });
+    }
     case 'shots':
       return eventLog.filter(({eventType}) => eventType === "shot");
     case 'raw':
@@ -124,6 +135,10 @@ const StatsProvider = ({endpointUrl, children}) => {
     eventStream.on("goalCorrection", ({id, teamId, time}) => {
       addEvent({eventType: "goalCorrection", id, teamId, time});
     });
+    eventStream.on("substitution", ({id, teamId, time, inPersonId, inPerson, outPersonId, outPerson}) => {
+      addEvent({id, eventType: "substitution", teamId, time, inPersonId, inPerson, outPersonId, outPerson});
+    });
+
     eventStream.on("startPeriod", ({period}) => {
       addEvent({eventType: "startPeriod", period});
     });
