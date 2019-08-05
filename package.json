@@ -1,6 +1,6 @@
 {
   "name": "@teamtv/eventstream-client-react",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "React component for easy use of the teamtv eventstream-client",
   "main": "./distribution/index.js",
   "scripts": {
