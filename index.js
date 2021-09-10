@@ -53,8 +53,10 @@ const statsCollector = (eventLog, type, preCalculated) => {
     case 'period': {
       const periodEvents = eventLog.filter(({eventType}) => eventType === "startPeriod" || eventType === "endPeriod");
       return {
-        period1: periodState(periodEvents.filter(({period}) => period == '1')),
-        period2: periodState(periodEvents.filter(({period}) => period == '2'))
+        period1: periodState(periodEvents.filter(({period}) => period === '1')),
+        period2: periodState(periodEvents.filter(({period}) => period === '2')),
+        period3: periodState(periodEvents.filter(({period}) => period === '3')),
+        period4: periodState(periodEvents.filter(({period}) => period === '4'))
       };
     }
     case 'goals': {
@@ -97,7 +99,24 @@ const statsCollector = (eventLog, type, preCalculated) => {
 const Context = React.createContext([]);
 
 const StatsProvider = ({endpointUrl, children}) => {
-  const [eventLog, setEventLog] = useState([]);
+  const [eventLog, setEventLog] = useState([])
+  const [serverTime, setServerTime] = useState(0);
+  const [lastTimestamp, setLastTimestamp] = useState(null);
+
+  useEffect(() => {
+    const interval = setInterval(
+        () => {
+          if (!!lastTimestamp)
+          {
+            setServerTime(
+                (performance.now() - lastTimestamp.now) + lastTimestamp.serverTime
+            );
+          }
+      }, 1000);
+    return () => {
+      clearInterval(interval);
+    }
+  }, [lastTimestamp])
 
   useEffect(() => {
     setEventLog([]);
@@ -108,6 +127,13 @@ const StatsProvider = ({endpointUrl, children}) => {
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
       setEventLog(_eventLog.slice());
+    }, 10);
+
+    const scheduleLastTimestamp = debounce((timestamp) => {
+      setLastTimestamp({
+        serverTime,
+        now: performance.now()
+      })
     }, 10);
 
     const addEvent = (event) => {
@@ -125,27 +151,28 @@ const StatsProvider = ({endpointUrl, children}) => {
       scheduleFlush();
     };
 
-    eventStream.on("sportingEventCreated", ({homeTeam, awayTeam, scheduledAt}) => {
+    eventStream.on("sportingEventCreated", ({homeTeam, awayTeam, scheduledAt}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
       addEvent({eventType: "sportingEventCreated", homeTeam, awayTeam, scheduledAt});
     });
 
-    eventStream.on("shot", ({id, time, personId, person, result, type, possession: {teamId}}) => {
+    eventStream.on("shot", ({id, time, personId, person, result, type, possession: {teamId}}, timestamp) => {
       addEvent({id, eventType: "shot", result, personId, teamId, time, person, type});
     });
-    eventStream.on("goalCorrection", ({id, teamId, time}) => {
+    eventStream.on("goalCorrection", ({id, teamId, time}, timestamp) => {
       addEvent({eventType: "goalCorrection", id, teamId, time});
     });
-    eventStream.on("substitution", ({id, teamId, time, inPersonId, inPerson, outPersonId, outPerson}) => {
+    eventStream.on("substitution", ({id, teamId, time, inPersonId, inPerson, outPersonId, outPerson}, timestamp) => {
       addEvent({id, eventType: "substitution", teamId, time, inPersonId, inPerson, outPersonId, outPerson});
     });
 
-    eventStream.on("startPeriod", ({period}) => {
+    eventStream.on("startPeriod", ({period}, timestamp) => {
       addEvent({eventType: "startPeriod", period});
     });
-    eventStream.on("endPeriod", ({period}) => {
+    eventStream.on("endPeriod", ({period}, timestamp) => {
       addEvent({eventType: "endPeriod", period});
     });
-    eventStream.on("observationRemoved", ({id}) => {
+    eventStream.on("observationRemoved", ({id}, timestamp) => {
       addEvent({eventType: "removed", id});
     });
 
