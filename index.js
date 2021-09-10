@@ -106,7 +106,7 @@ const statsCollector = (eventLog, type, preCalculated, serverTime) => {
 
 const Context = React.createContext([]);
 
-const StatsProvider = ({endpointUrl, children}) => {
+const StatsProvider = ({endpointUrl, periodCount, children}) => {
   const [eventLog, setEventLog] = useState([])
   const [serverTime, setServerTime] = useState(0);
   const [lastTimestamp, setLastTimestamp] = useState(null);
@@ -129,7 +129,7 @@ const StatsProvider = ({endpointUrl, children}) => {
   useEffect(() => {
     setEventLog([]);
 
-    const eventStreamSource = new PollingEventStreamSource(endpointUrl);
+    const eventStreamSource = new PollingEventStreamSource(endpointUrl, periodCount);
     const eventStream = new EventStream(eventStreamSource);
 
     const _eventLog = [];
@@ -141,7 +141,8 @@ const StatsProvider = ({endpointUrl, children}) => {
       setLastTimestamp({
         serverTime: timestamp,
         now: performance.now()
-      })
+      });
+      setServerTime(timestamp);
     }, 10);
 
     const addEvent = (event) => {
