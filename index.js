@@ -106,8 +106,8 @@ const statsCollector = (eventLog, type, preCalculated, serverTime) => {
 
 const Context = React.createContext([]);
 
-const StatsProvider = ({endpointUrl, periodCount, children}) => {
-  const [eventLog, setEventLog] = useState([])
+const StatsProvider = ({endpointUrl, children, options}) => {
+  const [eventLog, setEventLog] = useState([]);
   const [serverTime, setServerTime] = useState(0);
   const [lastTimestamp, setLastTimestamp] = useState(null);
 
@@ -129,8 +129,15 @@ const StatsProvider = ({endpointUrl, periodCount, children}) => {
   useEffect(() => {
     setEventLog([]);
 
-    const eventStreamSource = new PollingEventStreamSource(endpointUrl);
-    const eventStream = new EventStream(eventStreamSource, periodCount);
+    let refreshInterval = parseInt(options.refreshInterval) || 5;
+    if (refreshInterval < 5) {
+      refreshInterval = 5;
+    } else if (refreshInterval > 120) {
+      refreshInterval = 120;
+    }
+
+    const eventStreamSource = new PollingEventStreamSource(endpointUrl, refreshInterval);
+    const eventStream = new EventStream(eventStreamSource, options.periodCount || 2);
 
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
