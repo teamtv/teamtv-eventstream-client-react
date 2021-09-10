@@ -17,18 +17,26 @@ const debounce = (func, wait, immediate) => {
   };
 };
 
-const periodState = (periodEvents) => {
+const periodState = (periodEvents, serverTime) => {
   const eventTypes = periodEvents.map(({eventType}) => eventType);
   if (eventTypes.indexOf("endPeriod") !== -1) {
-    return "ENDED";
+    return {state: "ENDED"};
   } else if (eventTypes.indexOf("startPeriod") !== -1) {
-    return "STARTED";
+    let time = null;
+    if (serverTime !== 0) {
+      for (const event of periodEvents) {
+        if (event.eventType === 'startPeriod') {
+          time = serverTime - (new Date(event.occurredOn) / 1000);
+        }
+      }
+    }
+    return {state: "STARTED", time};
   } else {
-    return "NOT-STARTED";
+    return {state: "NOT-STARTED"};
   }
 };
 
-const statsCollector = (eventLog, type, preCalculated) => {
+const statsCollector = (eventLog, type, preCalculated, serverTime) => {
   switch (type) {
     case 'match': {
       const createdEvents = eventLog.filter(({eventType}) => eventType === "sportingEventCreated");
@@ -53,15 +61,17 @@ const statsCollector = (eventLog, type, preCalculated) => {
     case 'period': {
       const periodEvents = eventLog.filter(({eventType}) => eventType === "startPeriod" || eventType === "endPeriod");
       return {
-        period1: periodState(periodEvents.filter(({period}) => period == '1')),
-        period2: periodState(periodEvents.filter(({period}) => period == '2'))
+        period1: periodState(periodEvents.filter(({period}) => period === '1'), serverTime),
+        period2: periodState(periodEvents.filter(({period}) => period === '2'), serverTime),
+        period3: periodState(periodEvents.filter(({period}) => period === '3'), serverTime),
+        period4: periodState(periodEvents.filter(({period}) => period === '4'), serverTime)
       };
     }
     case 'goals': {
       const match = preCalculated.match || statsCollector(eventLog, 'match');
       const score = {home: 0, away: 0};
       return eventLog.filter(
-        ({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection"
+          ({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection"
       ).map((goal) => {
         if (goal.teamId === match.homeTeam.teamId) {
           score.home += 1;
@@ -78,7 +88,7 @@ const statsCollector = (eventLog, type, preCalculated) => {
     case 'substitutions': {
       const match = preCalculated.match || statsCollector(eventLog, 'match');
       return eventLog.filter(
-        ({eventType}) => eventType === "substitution"
+          ({eventType}) => eventType === "substitution"
       ).map((substitution) => {
         return {
           team: substitution.teamId === match.homeTeam.teamId ? match.homeTeam : match.awayTeam,
@@ -97,7 +107,24 @@ const statsCollector = (eventLog, type, preCalculated) => {
 const Context = React.createContext([]);
 
 const StatsProvider = ({endpointUrl, children}) => {
-  const [eventLog, setEventLog] = useState([]);
+  const [eventLog, setEventLog] = useState([])
+  const [serverTime, setServerTime] = useState(0);
+  const [lastTimestamp, setLastTimestamp] = useState(null);
+
+  useEffect(() => {
+    const interval = setInterval(
+        () => {
+          if (!!lastTimestamp)
+          {
+            setServerTime(
+                (performance.now() - lastTimestamp.now) / 1000 + lastTimestamp.serverTime
+            );
+          }
+        }, 1000);
+    return () => {
+      clearInterval(interval);
+    }
+  }, [lastTimestamp])
 
   useEffect(() => {
     setEventLog([]);
@@ -108,6 +135,13 @@ const StatsProvider = ({endpointUrl, children}) => {
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
       setEventLog(_eventLog.slice());
+    }, 10);
+
+    const scheduleLastTimestamp = debounce((timestamp) => {
+      setLastTimestamp({
+        serverTime: timestamp,
+        now: performance.now()
+      })
     }, 10);
 
     const addEvent = (event) => {
@@ -125,27 +159,41 @@ const StatsProvider = ({endpointUrl, children}) => {
       scheduleFlush();
     };
 
-    eventStream.on("sportingEventCreated", ({homeTeam, awayTeam, scheduledAt}) => {
+    eventStream.on("sportingEventCreated", ({homeTeam, awayTeam, scheduledAt}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({eventType: "sportingEventCreated", homeTeam, awayTeam, scheduledAt});
     });
 
-    eventStream.on("shot", ({id, time, personId, person, result, type, possession: {teamId}}) => {
+    eventStream.on("shot", ({id, time, personId, person, result, type, possession: {teamId}}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({id, eventType: "shot", result, personId, teamId, time, person, type});
     });
-    eventStream.on("goalCorrection", ({id, teamId, time}) => {
+    eventStream.on("goalCorrection", ({id, teamId, time}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({eventType: "goalCorrection", id, teamId, time});
     });
-    eventStream.on("substitution", ({id, teamId, time, inPersonId, inPerson, outPersonId, outPerson}) => {
+    eventStream.on("substitution", ({id, teamId, time, inPersonId, inPerson, outPersonId, outPerson}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({id, eventType: "substitution", teamId, time, inPersonId, inPerson, outPersonId, outPerson});
     });
 
-    eventStream.on("startPeriod", ({period}) => {
-      addEvent({eventType: "startPeriod", period});
+    eventStream.on("startPeriod", ({period, occurredOn}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
+      addEvent({eventType: "startPeriod", period, occurredOn});
     });
-    eventStream.on("endPeriod", ({period}) => {
+    eventStream.on("endPeriod", ({period}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({eventType: "endPeriod", period});
     });
-    eventStream.on("observationRemoved", ({id}) => {
+    eventStream.on("observationRemoved", ({id}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
       addEvent({eventType: "removed", id});
     });
 
@@ -155,29 +203,29 @@ const StatsProvider = ({endpointUrl, children}) => {
   }, [endpointUrl]);
 
   return (
-    <Context.Provider value={eventLog}>
-      {children}
-    </Context.Provider>
+      <Context.Provider value={{serverTime, eventLog}}>
+        {children}
+      </Context.Provider>
   );
 };
 
 const StatsConsumer = ({types, children}) => {
   return (
-    <Context.Consumer>
-      {
-        (eventLog) => {
-          const stats = {
-            match: statsCollector(eventLog, 'match'),
-          };
-          if (stats.match) {
-            for (const statsType of types) {
-              stats[statsType] = statsCollector(eventLog, statsType, stats);
+      <Context.Consumer>
+        {
+          ({eventLog, serverTime}) => {
+            const stats = {
+              match: statsCollector(eventLog, 'match'),
+            };
+            if (stats.match) {
+              for (const statsType of types) {
+                stats[statsType] = statsCollector(eventLog, statsType, stats, serverTime);
+              }
             }
+            return children(stats);
           }
-          return children(stats);
         }
-      }
-    </Context.Consumer>
+      </Context.Consumer>
   )
 };
 
