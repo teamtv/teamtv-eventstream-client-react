@@ -124,13 +124,13 @@ const StatsProvider = ({endpointUrl, periodCount, children}) => {
     return () => {
       clearInterval(interval);
     }
-  }, [lastTimestamp])
+  }, [lastTimestamp]);
 
   useEffect(() => {
     setEventLog([]);
 
-    const eventStreamSource = new PollingEventStreamSource(endpointUrl, periodCount);
-    const eventStream = new EventStream(eventStreamSource);
+    const eventStreamSource = new PollingEventStreamSource(endpointUrl);
+    const eventStream = new EventStream(eventStreamSource, periodCount);
 
     const _eventLog = [];
     const scheduleFlush = debounce(() => {
