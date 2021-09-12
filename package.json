@@ -1,6 +1,6 @@
 {
   "name": "@teamtv/eventstream-client-react",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "React component for easy use of the teamtv eventstream-client",
   "main": "./distribution/index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/teamtv/teamtv-eventstream-client-react#readme",
   "dependencies": {
-    "@teamtv/eventstream-client": "^1.0.10",
+    "@teamtv/eventstream-client": "^1.0.11",
     "react": "^16.8.6"
   },
   "devDependencies": {

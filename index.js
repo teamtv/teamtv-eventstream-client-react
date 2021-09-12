@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { EventStream, PollingEventStreamSource } from "@teamtv/eventstream-client";
 
+
 const debounce = (func, wait, immediate) => {
   let timeout;
   return function () {
@@ -52,7 +53,7 @@ const statsCollector = (eventLog, type, preCalculated, serverTime) => {
     }
     case 'score': {
       const match = preCalculated.match || statsCollector(eventLog, 'match');
-      const goals = eventLog.filter(({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection");
+      const goals = eventLog.filter(({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection" || eventType === "goal");
       return {
         home: goals.filter(({teamId}) => teamId === match.homeTeam.teamId).length,
         away: goals.filter(({teamId}) => teamId === match.awayTeam.teamId).length,
@@ -71,7 +72,7 @@ const statsCollector = (eventLog, type, preCalculated, serverTime) => {
       const match = preCalculated.match || statsCollector(eventLog, 'match');
       const score = {home: 0, away: 0};
       return eventLog.filter(
-          ({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection"
+          ({eventType, result}) => (eventType === "shot" && result === "GOAL") || eventType === "goalCorrection" || eventType === "goal"
       ).map((goal) => {
         if (goal.teamId === match.homeTeam.teamId) {
           score.home += 1;
@@ -177,6 +178,11 @@ const StatsProvider = ({endpointUrl, children, options}) => {
       scheduleLastTimestamp(timestamp);
 
       addEvent({id, eventType: "shot", result, personId, teamId, time, person, type});
+    });
+    eventStream.on("goal", ({id, teamId, time}, timestamp) => {
+      scheduleLastTimestamp(timestamp);
+
+      addEvent({eventType: "goal", id, teamId, time});
     });
     eventStream.on("goalCorrection", ({id, teamId, time}, timestamp) => {
       scheduleLastTimestamp(timestamp);
